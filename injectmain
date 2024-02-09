@@ -1,0 +1,69 @@
+program Inject;
+
+uses SysUtils, JwaTlHelp32, Windows;
+
+function GetProcessIDByExeName(const exeName: string): DWORD;
+var
+  hSnapshot: THandle;
+  pe32: TProcessEntry32;
+begin
+  Result := 0;
+
+  hSnapshot := CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if hSnapshot <> INVALID_HANDLE_VALUE then
+  begin
+    pe32.dwSize := SizeOf(TProcessEntry32);
+    if Process32First(hSnapshot, pe32) then
+    begin
+      repeat
+        if CompareText(extractfilename(pe32.szExeFile), exeName) = 0 then
+        begin
+          Result := pe32.th32ProcessID;
+          Break;
+        end;
+      until not Process32Next(hSnapshot, pe32);
+    end;
+
+    CloseHandle(hSnapshot);
+  end;
+end;
+
+function InjectDLL(const DLLPath: string; const PID: DWORD): Boolean;
+var
+  hProcess: THandle;
+  hThread: THandle;
+  BaseAddress: Pointer;
+  Size: Cardinal;
+  ThreadID: DWORD;
+begin
+  Result := False;
+  hProcess := OpenProcess(PROCESS_ALL_ACCESS, False, PID);
+  if (hProcess <> 0) then
+  begin
+    BaseAddress := VirtualAllocEx(hProcess, nil, Length(DllPath) + 1, MEM_COMMIT, PAGE_READWRITE );
+    if BaseAddress <> nil then
+       WriteProcessMemory(hProcess, BaseAddress, PChar(DllPath), Length(DllPath) + 1, Size);
+       if Length(DLLPath) + 1 = Size then
+       begin
+         hThread := CreateRemoteThread(hProcess, nil, 0, GetProcAddress(LoadLibrary('kernel32.dll'), 'LoadLibraryA' ), BaseAddress, 0, ThreadID);
+         Result := hThread <> 0;
+         WaitForSingleObject(hThread, INFINITE);
+       end;
+       VirtualFreeEx(hProcess, BaseAddress, 0, MEM_RELEASE);
+     end;
+     CloseHandle(hProcess);
+  end;
+
+const
+  DllPath = 'D:\Source\ReplayEngined\build\Release\ReplayEngine.dll';
+
+var
+  ProcessID: DWORD = 0;
+begin
+    while ProcessID = 0 do begin
+      ProcessID := GetProcessIDByExeName('GeometryDash.exe');
+    Sleep(1000);
+  end;
+
+  InjectDLL(DllPath, ProcessID);
+end.
