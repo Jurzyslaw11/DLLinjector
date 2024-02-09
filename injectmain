@@ -55,13 +55,13 @@ begin
   end;
 
 const
-  DllPath = 'D:\Source\ReplayEngined\build\Release\ReplayEngine.dll';
+  DllPath = '';
 
 var
   ProcessID: DWORD = 0;
 begin
     while ProcessID = 0 do begin
-      ProcessID := GetProcessIDByExeName('GeometryDash.exe');
+      ProcessID := GetProcessIDByExeName('game.exe');
     Sleep(1000);
   end;
 
